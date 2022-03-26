@@ -124,14 +124,66 @@ class _MyWidgetState extends State<MyWidget> {
     // https://pub.dev/packages/pointycastle pointycastle: ^3.5.2
     // https://github.com/bcgit/pc-dart
 
+/*
+curce P521 runs an error in computeSecret:
+======== Exception caught by gesture ===============================================================
+The following RangeError was thrown while handling a gesture:
+RangeError (end): Invalid value: Not in inclusive range 130..131: 132
+
+When the exception was thrown, this was the stack:
+#0      RangeError.checkValidRange (dart:core/errors.dart:338:9)
+#1      _StringBase.substring (dart:core-patch/string_patch.dart:400:27)
+#2      _MyWidgetState.computeSecretOwn.<anonymous closure> (package:ecdhe_encrypt_playground/main.dart:382:39)
+#3      new _GrowableList.generate (dart:core-patch/growable_array.dart:133:28)
+#4      _MyWidgetState.computeSecretOwn (package:ecdhe_encrypt_playground/main.dart:381:12)
+#5      _MyWidgetState.runYourMainDartCode (package:ecdhe_encrypt_playground/main.dart:161:36)
+#6      _MyWidgetState.build.<anonymous closure> (package:ecdhe_encrypt_playground/main.dart:84:21)
+#7      _InkResponseState._handleTap (package:flutter/src/material/ink_well.dart:989:21)
+#8      GestureRecognizer.invokeCallback (package:flutter/src/gestures/recognizer.dart:198:24)
+#9      TapGestureRecognizer.handleTapUp (package:flutter/src/gestures/tap.dart:608:11)
+#10     BaseTapGestureRecognizer._checkUp (package:flutter/src/gestures/tap.dart:296:5)
+#11     BaseTapGestureRecognizer.handlePrimaryPointer (package:flutter/src/gestures/tap.dart:230:7)
+#12     PrimaryPointerGestureRecognizer.handleEvent (package:flutter/src/gestures/recognizer.dart:563:9)
+#13     PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:94:12)
+#14     PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:139:9)
+#15     _LinkedHashMapMixin.forEach (dart:collection-patch/compact_hash.dart:539:8)
+#16     PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:137:18)
+#17     PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:123:7)
+#18     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:439:19)
+#19     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:419:22)
+#20     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:322:11)
+#21     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:374:7)
+#22     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:338:5)
+#23     GestureBinding._flushPointerEventQueue (package:flutter/src/gestures/binding.dart:296:7)
+#24     GestureBinding._handlePointerDataPacket (package:flutter/src/gestures/binding.dart:279:7)
+#28     _invoke1 (dart:ui/hooks.dart:169:10)
+#29     PlatformDispatcher._dispatchPointerDataPacket (dart:ui/platform_dispatcher.dart:293:7)
+#30     _dispatchPointerDataPacket (dart:ui/hooks.dart:88:31)
+(elided 3 frames from dart:async)
+Handler: "onTap"
+Recognizer: TapGestureRecognizer#5482f
+  debugOwner: GestureDetector
+  state: possible
+  won arena
+  finalPosition: Offset(370.0, 899.3)
+  finalLocalPosition: Offset(81.3, 15.3)
+  button: 1
+  sent tap down
+
+ */
+
     int AES_GCM_NONCE_BYTES = 12; // AES GCM recommended nonce length = 96 bit = 12 byte
 
-    String programInfo = 'ECDHE encryption with Elliptic curve key exchange using curve P-256 and AES-256 in GCM mode. It works like the SEALED BOX in SODIUM.';
+    //String programInfo = 'ECDHE encryption with Elliptic curve key exchange using curve P-256 and AES-256 in GCM mode. It works like the SEALED BOX in SODIUM.';
+    String programInfo = 'ECDHE encryption with Elliptic curve key exchange using curve P-384 and AES-256 in GCM mode. It works like the SEALED BOX in SODIUM.';
+    //String programInfo = 'ECDHE encryption with Elliptic curve key exchange using curve P-521 and AES-256 in GCM mode. It works like the SEALED BOX in SODIUM.';
     printC(programInfo);
 
     printC('\nStep 1: generate an ECDH keypair by the recipient');
-    // generate a private key with curve P-256
-    PrivateKey privateKeyRecipient = generateEcdhKeyP256();
+    // generate a private key with curve P-256 / P-384 / P-512
+    //PrivateKey privateKeyRecipient = generateEcdhKeyP256();
+    PrivateKey privateKeyRecipient = generateEcdhKeyP384();
+    //PrivateKey privateKeyRecipient = generateEcdhKeyP521();
     PublicKey publicKeyRecipient = privateKeyRecipient.publicKey;
     String publicKeyRecipientHex = publicKeyRecipient.toHex();
 
@@ -143,13 +195,19 @@ class _MyWidgetState extends State<MyWidget> {
     printC('plaintext: ' + plaintext);
 
     printC('\nStep 4: generate an Ephemeral ECDH keypair by the sender');
-    PrivateKey privateKeySenderEphemeral = generateEcdhKeyP256();
+    //PrivateKey privateKeySenderEphemeral = generateEcdhKeyP256();
+    PrivateKey privateKeySenderEphemeral = generateEcdhKeyP384();
+    //PrivateKey privateKeySenderEphemeral = generateEcdhKeyP521();
     PublicKey publicKeySenderEphemeral = privateKeySenderEphemeral.publicKey;
 
     printC('\nStep 5: calculate the sharedSecretSender from privateKeySender and publicKeyRecipient');
     // first: rebuild the publicKey from the hexstring
-    PublicKey publicKeyRecipientFromHexstring = publicKeyFromHexstringP256(publicKeyRecipientHex);
+    //PublicKey publicKeyRecipientFromHexstring = publicKeyFromHexstringP256(publicKeyRecipientHex);
+    PublicKey publicKeyRecipientFromHexstring = publicKeyFromHexstringP384(publicKeyRecipientHex);
+    //PublicKey publicKeyRecipientFromHexstring = publicKeyFromHexstringP521(publicKeyRecipientHex);
     List<int> sharedSecretSender = computeSecret(privateKeySenderEphemeral, publicKeyRecipientFromHexstring);
+    //List<int> sharedSecretSender = computeSecretOwn(privateKeySenderEphemeral, publicKeyRecipientFromHexstring);
+    printC('sharedSecretSender length: ' + sharedSecretSender.length.toString());
     printC('sharedSecretSender (base64): ' + base64EncodingListInt(sharedSecretSender));
 
     printC('\nStep 6: calculate a hash from publicKeySender and publicKeyRecipient using Blake2b algorithm');
@@ -177,7 +235,9 @@ class _MyWidgetState extends State<MyWidget> {
     int publicKeySenderLength = getPublicKeyLength(publicKeySenderLengthUint8List);
     // 3 get the publicKeySender
     Uint8List publicKeySenderUint8List = new Uint8List.sublistView(sealedBoxRecipient, 4, (4 + publicKeySenderLength));
-    PublicKey publicKeySender = publicKeyFromUint8ListP256(publicKeySenderUint8List);
+    //PublicKey publicKeySender = publicKeyFromUint8ListP256(publicKeySenderUint8List);
+    PublicKey publicKeySender = publicKeyFromUint8ListP384(publicKeySenderUint8List);
+    //PublicKey publicKeySender = publicKeyFromUint8ListP521(publicKeySenderUint8List);
     // 4 get the ciphertext
     Uint8List ciphertextReceived = new Uint8List.sublistView(sealedBoxRecipient, (4 + publicKeySenderLength), sealedBoxRecipient.lengthInBytes);
 
@@ -186,7 +246,9 @@ class _MyWidgetState extends State<MyWidget> {
     printC('nonceBlake2bRecipient base64: ' + base64.encode(nonceBlake2bRecipient));
 
     printC('\nStep 12: generate the sharedSecretRecipient');
-    var secretKeyRecipient = computeSecret(privateKeyRecipient, publicKeySender);
+    List<int> secretKeyRecipient = computeSecret(privateKeyRecipient, publicKeySender);
+    //List<int> secretKeyRecipient = computeSecret(privateKeyRecipient, publicKeySender);
+    printC('secretKeyRecipient length: ' + secretKeyRecipient.length.toString());
     printC('secretKeyRecipient base64: ' + base64Encoding(Uint8List.fromList(secretKeyRecipient)));
 
     printC('\nStep 13: decrypt the ciphertext');
@@ -195,64 +257,22 @@ class _MyWidgetState extends State<MyWidget> {
     printC('decryptedText: ' + cleartext);
   }
 
-  String aesGcmEncryptToBase64(
-      List<int> key, Uint8List nonce, String plaintext) {
-    try {
-      var plaintextUint8 = createUint8ListFromString(plaintext);
-
-      final cipher = pc.GCMBlockCipher(pc.AESEngine());
-      var aeadParameters =
-      pc.AEADParameters(pc.KeyParameter(Uint8List.fromList(key)), 128, nonce, Uint8List(0));
-      cipher.init(true, aeadParameters);
-      var ciphertextWithTag = cipher.process(plaintextUint8);
-      var ciphertextWithTagLength = ciphertextWithTag.lengthInBytes;
-      var ciphertextLength =
-          ciphertextWithTagLength - 16; // 16 bytes = 128 bit tag length
-      var ciphertext =
-      Uint8List.sublistView(ciphertextWithTag, 0, ciphertextLength);
-      var gcmTag = Uint8List.sublistView(
-          ciphertextWithTag, ciphertextLength, ciphertextWithTagLength);
-      final nonceBase64 = base64.encode(nonce);
-      final ciphertextBase64 = base64.encode(ciphertext);
-      final gcmTagBase64 = base64.encode(gcmTag);
-      return nonceBase64 +
-          ':' +
-          ciphertextBase64 +
-          ':' +
-          gcmTagBase64;
-    } catch (error) {
-      return 'Fehler bei der Verschlüsselung';
-    }
-  }
-
   Uint8List aesGcmEncryptToUint8List(
       List<int> key, Uint8List nonce, String plaintext) {
     print('** aesGcmEncrypt key: ' + base64Encoding(Uint8List.fromList(key)) + ' nonce: ' + base64Encoding(nonce));
+    // cut the key length if longer then 32
+    if (key.length > 32) {
+      key = key.sublist(0, 32);
+      print('key.length new: ' + key.length.toString());
+    }
     try {
       var plaintextUint8 = createUint8ListFromString(plaintext);
-
       final cipher = pc.GCMBlockCipher(pc.AESEngine());
       var aeadParameters =
       pc.AEADParameters(pc.KeyParameter(Uint8List.fromList(key)), 128, nonce, Uint8List(0));
       cipher.init(true, aeadParameters);
       var ciphertextWithTag = cipher.process(plaintextUint8);
       return ciphertextWithTag;
-      /*
-      var ciphertextWithTagLength = ciphertextWithTag.lengthInBytes;
-      var ciphertextLength =
-          ciphertextWithTagLength - 16; // 16 bytes = 128 bit tag length
-      var ciphertext =
-      Uint8List.sublistView(ciphertextWithTag, 0, ciphertextLength);
-      var gcmTag = Uint8List.sublistView(
-          ciphertextWithTag, ciphertextLength, ciphertextWithTagLength);
-      final nonceBase64 = base64.encode(nonce);
-      final ciphertextBase64 = base64.encode(ciphertext);
-      final gcmTagBase64 = base64.encode(gcmTag);
-      return nonceBase64 +
-          ':' +
-          ciphertextBase64 +
-          ':' +
-          gcmTagBase64;*/
     } catch (error) {
       return Uint8List(0);
     }
@@ -261,43 +281,17 @@ class _MyWidgetState extends State<MyWidget> {
   String aesGcmDecryptFromUint8List(List<int> key, Uint8List nonce, Uint8List ciphertext)
   {
     print('** aesGcmDecrypt key: ' + base64Encoding(Uint8List.fromList(key)) + ' nonce: ' + base64Encoding(nonce));
+    // cut the key length if longer then 32
+    if (key.length > 32) {
+      key = key.sublist(0, 32);
+      print('key.length new: ' + key.length.toString());
+    }
     try {
       final cipher = pc.GCMBlockCipher(pc.AESEngine());
       var aeadParameters =
       pc.AEADParameters(pc.KeyParameter(Uint8List.fromList(key)), 128, nonce, Uint8List(0));
       cipher.init(false, aeadParameters);
       return String.fromCharCodes(cipher.process(ciphertext));
-    } catch (error) {
-      printC('error: ' + error.toString());
-      return 'Fehler bei der Entschlüsselung';
-    }
-  }
-
-  String aesGcmIterPbkdf2DecryptFromBase64(
-      String password, String iterations, String data) {
-    try {
-      var parts = data.split(':');
-      var salt = base64Decoding(parts[0]);
-      var nonce = base64Decoding(parts[1]);
-      var ciphertext = base64Decoding(parts[2]);
-      var gcmTag = base64Decoding(parts[3]);
-      var bb = BytesBuilder();
-      bb.add(ciphertext);
-      bb.add(gcmTag);
-      var ciphertextWithTag = bb.toBytes();
-      var passphrase = createUint8ListFromString(password);
-      final PBKDF2_ITERATIONS = int.tryParse(iterations);
-      pc.KeyDerivator derivator =
-      new pc.PBKDF2KeyDerivator(new pc.HMac(new pc.SHA256Digest(), 64));
-      pc.Pbkdf2Parameters params =
-      new pc.Pbkdf2Parameters(salt, PBKDF2_ITERATIONS!, 32);
-      derivator.init(params);
-      final key = derivator.process(passphrase);
-      final cipher = pc.GCMBlockCipher(pc.AESFastEngine());
-      var aeadParameters =
-      pc.AEADParameters(pc.KeyParameter(key), 128, nonce, Uint8List(0));
-      cipher.init(false, aeadParameters);
-      return new String.fromCharCodes(cipher.process(ciphertextWithTag));
     } catch (error) {
       printC('error: ' + error.toString());
       return 'Fehler bei der Entschlüsselung';
@@ -402,6 +396,46 @@ class _MyWidgetState extends State<MyWidget> {
   PublicKey publicKeyFromUint8ListP256(Uint8List publicKeyUint8List) {
     var ec = getP256();
     return ec.hexToPublicKey(bin2hex(publicKeyUint8List));
+  }
+
+  PrivateKey generateEcdhKeyP384() {
+    var ec = getP384();
+    return ec.generatePrivateKey();
+  }
+
+  PublicKey publicKeyFromHexstringP384(String publicKeyHex) {
+    var ec = getP384();
+    return ec.hexToPublicKey(publicKeyHex);
+  }
+
+  PublicKey publicKeyFromUint8ListP384(Uint8List publicKeyUint8List) {
+    var ec = getP384();
+    return ec.hexToPublicKey(bin2hex(publicKeyUint8List));
+  }
+
+  PrivateKey generateEcdhKeyP521() {
+    var ec = getP521();
+    return ec.generatePrivateKey();
+  }
+
+  PublicKey publicKeyFromHexstringP521(String publicKeyHex) {
+    var ec = getP521();
+    return ec.hexToPublicKey(publicKeyHex);
+  }
+
+  PublicKey publicKeyFromUint8ListP521(Uint8List publicKeyUint8List) {
+    var ec = getP521();
+    return ec.hexToPublicKey(bin2hex(publicKeyUint8List));
+  }
+
+  List<int> computeSecretOwn(PrivateKey selfPriv, PublicKey otherPub) {
+    assert(selfPriv.curve == otherPub.curve);
+    var curve = selfPriv.curve;
+    var byteLen = (curve.bitSize + 7) ~/ 8;
+    var p = curve.scalarMul(otherPub, selfPriv.bytes);
+    var hex = p.X.toRadixString(16);
+    return List<int>.generate(
+        byteLen, (i) => int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16));
   }
 
   /*
