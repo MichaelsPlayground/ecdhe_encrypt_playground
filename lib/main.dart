@@ -143,17 +143,17 @@ class _MyWidgetState extends State<MyWidget> {
     printC('plaintext: ' + plaintext);
 
     printC('\nStep 4: generate an Ephemeral ECDH keypair by the sender');
-    PrivateKey privateKeySender = generateEcdhKeyP256();
-    PublicKey publicKeySender = privateKeySender.publicKey;
+    PrivateKey privateKeySenderEphemeral = generateEcdhKeyP256();
+    PublicKey publicKeySenderEphemeral = privateKeySenderEphemeral.publicKey;
 
     printC('\nStep 5: calculate the sharedSecretSender from privateKeySender and publicKeyRecipient');
     // first: rebuild the publicKey from the hexstring
     PublicKey publicKeyRecipientFromHexstring = publicKeyFromHexstringP256(publicKeyRecipientHex);
-    List<int> sharedSecretSender = computeSecret(privateKeySender, publicKeyRecipientFromHexstring);
+    List<int> sharedSecretSender = computeSecret(privateKeySenderEphemeral, publicKeyRecipientFromHexstring);
     printC('sharedSecretSender (base64): ' + base64EncodingListInt(sharedSecretSender));
 
     printC('\nStep 6: calculate a hash from publicKeySender and publicKeyRecipient using Blake2b algorithm');
-    var nonceSender = getNonceByBlake2b(publicKeySender.toHex(), publicKeyRecipientHex, AES_GCM_NONCE_BYTES);
+    Uint8List nonceSender = getNonceByBlake2b(publicKeySenderEphemeral.toHex(), publicKeyRecipientHex, AES_GCM_NONCE_BYTES);
     printC('nonceSender (base64): ' + base64Encoding(nonceSender));
 
     printC('\nStep 7: encrypt the plaintext with algorithm AES GCM mode, use sharedSecretSender and nonceSender as parameters');
@@ -161,139 +161,38 @@ class _MyWidgetState extends State<MyWidget> {
     printC('ciphertext (base64): ' + base64Encoding(ciphertextSender));
 
     printC('\nStep 8: concatenate the publicKeySender and ciphertext to a SEALED BOX');
-    var sealedBox = makeASealedBox(publicKeySender, ciphertextSender);
-    printC('sealedBox: ' + base64Encoding(sealedBox));
+    Uint8List sealedBox = makeASealedBox(publicKeySenderEphemeral, ciphertextSender);
+    // sealedBox is publicKeySender length (4 bytes) - publicKeySender - ciphertext
+    String sealedBoxBase64 = base64Encoding(sealedBox);
+    printC('sealedBox base64: ' + sealedBoxBase64);
 
+    printC('\nStep 9: send the sealed box to the recipient');
+    Uint8List sealedBoxRecipient = base64Decoding(sealedBoxBase64);
 
-
-
-    // run an ecdh regular with two keypairs
-    // use elliptic curves
-    printC('\n*** now running ECDH dart-elliptic ***');
-
-    var ec = getP256();
-    var priv = ec.generatePrivateKey();
-    var pub = priv.publicKey;
-    printC('privateKey: 0x$priv');
-    printC('publicKey: 0x$pub');
-    printC('pubKey hex: ' + pub.toHex());
-
-    // use ecdh
-    var privateAlice = ec.generatePrivateKey();
-    var publicAlice = privateAlice.publicKey;
-    var privateBob = ec.generatePrivateKey();
-    var publicBob = privateBob.publicKey;
-    var secretAlice = computeSecretHex(privateAlice, publicBob);
-    var secretBob = computeSecretHex(privateBob, publicAlice);
-    var secretBobBytes = computeSecret(privateBob, publicAlice);
-    printC('secretAlice: 0x$secretAlice');
-    printC('secretBob: 0x$secretBob');
-    printC('secretBob base64: ' + base64.encode(secretBobBytes));
-
-    printC('*** now run AES 256 GCM encryption ***');
-    // pointycastle: ^3.5.2
-    var plaintext2 = 'The quick brown fox';
-    printC('plaintext: ' + plaintext);
-    final nonce = generateRandomNonce();
-    var ciphertext = aesGcmEncryptToBase64(secretBobBytes, nonce, plaintext);
-    printC('ciphertext: ' + ciphertext);
-
-    printC('\n*** now running ECDHE ***');
-    printC('all we have is Bobs = recipients public key');
-    var publicBobHex = publicBob.toHex();
-    printC('pubBob hex: ' + publicBobHex);
-    var publicRecipient = ec.hexToPublicKey(publicBobHex);
-    printC('pubRec hex: ' + publicRecipient.toHex());
-
-    // constants
-    var NONCEBYTES = 12; // AES GCM recommended nonce length = 96 bit = 12 byte
-    var PUBLICKEYBYTES = 32;
-    var MACBYTES = 16; // AES GCM recommended tag length = 128 bit = 16 byte
-    var SEALBYTES = PUBLICKEYBYTES + MACBYTES;
-    printC('now we generate the ephemeral keypair');
-    var privateEphemeral = ec.generatePrivateKey();
-    var publicEphemeral = privateEphemeral.publicKey;
-    printC('we generate the sharedSecret from ephemeral keypair');
-    var secretShareBobEphemeral = computeSecret(privateBob, publicEphemeral);
-    var secretShareEphemeralBob = computeSecret(privateEphemeral, publicBob);
-    printC('secretShareEphemeralBob base64: ' + base64Encoding(Uint8List.fromList(secretShareEphemeralBob)));
-    printC('secretShareBobEphemeral base64: ' + base64Encoding(Uint8List.fromList(secretShareBobEphemeral)));
-    printC('we are hashing the ephemeral publicKey and Bobs publicKey with Blake2b');
-
-
-
-    // written in java: https://stackoverflow.com/a/42456750/8166854
-    // answered Feb 25, 2017 by Peter Bendel
-    // generate nonce by hashing the public keys with Blake2b
-    var nonceBlake2b = getNonceByBlake2b(publicEphemeral.toHex(), publicRecipient.toHex(), NONCEBYTES);
-    // todo: check nonce length and NOT filled with 'x00'
-    printC('nonceBlake2b base64: ' + base64.encode(nonceBlake2b));
-    // generate ecdh key
-    var secretKeySender = computeSecret(privateEphemeral, publicRecipient);
-    printC('secretKeySender base64: ' + base64Encoding(Uint8List.fromList(secretKeySender)));
-    // encrypt the plaintext
-    var ciphertextSender2 = aesGcmEncryptToUint8List(secretKeySender, nonceBlake2b, plaintext);
-    printC('ciphertextSender base64: ' + base64Encoding(ciphertextSender));
-
-    // convert publicEphemeralUint8List.length to byte array
-    // first convert the publicEphemeral to a Uint8List
-    Uint8List publicEphemeralUint8List = createUint8ListFromHexString(publicEphemeral.toHex());
-    int publicEphemeralLength = publicEphemeralUint8List.lengthInBytes;
-    printC('publicEphemeralLength: ' + publicEphemeralLength.toString());
-    String publicEphemeralLengthHex = publicEphemeralLength.toRadixString(16).padLeft(4, '0');
-    printC('publicEphemeralLengthHex: ' + publicEphemeralLengthHex); //
-    var publicEphemeralLengthHexUint8List = createUint8ListFromString(publicEphemeralLengthHex);
-    printC('publicEphemeralLengthHexUint8List length: ' + publicEphemeralLengthHexUint8List.lengthInBytes.toString());
-
-    // the output is publicEphemeralLength publicEphemeral ciphertext
-    var bbSender = BytesBuilder();
-    printC('publicEphemeral hex: ' + publicEphemeral.toHex());
-    bbSender.add(publicEphemeralLengthHexUint8List); // length of the following publicEphemeral
-    bbSender.add(createUint8ListFromHexString(publicEphemeral.toHex()));
-    bbSender.add(ciphertextSender);
-    var sealedBoxSender = bbSender.toBytes();
-    var sealedBoxSenderBase64 = base64Encoding(sealedBoxSender);
-    printC('sealedBox base64: ' + sealedBoxSenderBase64);
-
-    printC('\n*** decryption on Bobs = recipients side ***');
-    printC('Bob receives the sealedBoxSenderBase64');
-    var sealedBoxRecipient = base64Decoding(sealedBoxSenderBase64);
-    printC('sealedBoxRecipientLength: ' + sealedBoxRecipient.lengthInBytes.toString());
-    // split the sealedBox in publicKeySenderLength, publicKeySender and ciphertext
+    printC('\nStep 10: split the sealedBox into publicKeySender and ciphertext');
+    // 1 get the bytes 0..3 and get the length of the following publicKeySender
     Uint8List publicKeySenderLengthUint8List = new Uint8List.sublistView(sealedBoxRecipient, 0, 4);
-    printC('publicKeySenderLengthUint8List length: ' + publicKeySenderLengthUint8List.lengthInBytes.toString());
-    // convert the data back to int
-    String publicEphemeralLengthHexBack = new String.fromCharCodes(publicKeySenderLengthUint8List);
-    printC('publicEphemeralLengthHexBack: ' + publicEphemeralLengthHexBack);
-    int publicKeySenderLength = int.parse(publicEphemeralLengthHexBack, radix: 16);
-    //int publicEphemeralLengthBack = int.parse('0041', radix: 16);
-    printC('publicKeySenderLength: ' + publicKeySenderLength.toString());
-    // now split the data
-    Uint8List publicKeySender2 = new Uint8List.sublistView(sealedBoxRecipient, 4, (4 + publicKeySenderLength));
-    Uint8List ciphertextReceived = new Uint8List.sublistView(sealedBoxRecipient, (4 + publicKeySenderLength), sealedBoxRecipient.lengthInBytes);
-    // build the ephemeralPublicKey
-    var publicKeySenderFromUint8List = ec.hexToPublicKey(bin2hex(publicKeySender2));
-    printC('publicKeySender hex: ' + publicKeySenderFromUint8List.toHex());
-    // now get the nonce from publicKeySender/Ephemeral and publicKeyBob
-    var nonceBlake2bReceiver = getNonceByBlake2b(publicKeySenderFromUint8List.toHex(), publicRecipient.toHex(), NONCEBYTES);
-    printC('nonceBlake2bReceiver base64: ' + base64.encode(nonceBlake2bReceiver));
-    // now generate the shared secret
-    //var secretKeyRecipient = computeSecret(privateBob, publicKeySenderFromUint8List);
-    var secretKeyRecipient = computeSecret(privateBob, publicEphemeral);
-    printC('secretKeyRecipient base64: ' + base64Encoding(Uint8List.fromList(secretKeyRecipient)));
-    // decrypt the ciphertext
-    printC('ciphertextReceived base64: ' + base64Encoding(ciphertextReceived));
-    // secretKeySender, nonce,
-    //String cleartext = aesGcmDecryptFromUint8List(secretKeySender, nonce, ciphertextReceived);
-    String cleartext = aesGcmDecryptFromUint8List(secretKeyRecipient, nonceBlake2bReceiver, ciphertextReceived);
-    printC('the decrypted data: ' + cleartext);
 
-    /*
-    printC('the actual time is:');
-    for( var i = 0 ; i < 30; i++) {
-      var now = DateTime.now();
-      printC(now.toString());
-    }*/
+    // 2 convert the data back to int
+    int publicKeySenderLength = getPublicKeyLength(publicKeySenderLengthUint8List);
+    // 3 get the publicKeySender
+    Uint8List publicKeySenderUint8List = new Uint8List.sublistView(sealedBoxRecipient, 4, (4 + publicKeySenderLength));
+    PublicKey publicKeySender = publicKeyFromUint8ListP256(publicKeySenderUint8List);
+    // 4 get the ciphertext
+    Uint8List ciphertextReceived = new Uint8List.sublistView(sealedBoxRecipient, (4 + publicKeySenderLength), sealedBoxRecipient.lengthInBytes);
+
+    printC('\nStep 11: generate the nonce from publicKeySender and publicKeyRecipient using Blake2b');
+    Uint8List nonceBlake2bRecipient = getNonceByBlake2b(publicKeySender.toHex(), publicKeyRecipient.toHex(), AES_GCM_NONCE_BYTES);
+    printC('nonceBlake2bRecipient base64: ' + base64.encode(nonceBlake2bRecipient));
+
+    printC('\nStep 12: generate the sharedSecretRecipient');
+    var secretKeyRecipient = computeSecret(privateKeyRecipient, publicKeySender);
+    printC('secretKeyRecipient base64: ' + base64Encoding(Uint8List.fromList(secretKeyRecipient)));
+
+    printC('\nStep 13: decrypt the ciphertext');
+    printC('ciphertextReceived base64: ' + base64Encoding(ciphertextReceived));
+    String cleartext = aesGcmDecryptFromUint8List(secretKeyRecipient, nonceBlake2bRecipient, ciphertextReceived);
+    printC('decryptedText: ' + cleartext);
   }
 
   String aesGcmEncryptToBase64(
@@ -500,6 +399,11 @@ class _MyWidgetState extends State<MyWidget> {
     return ec.hexToPublicKey(publicKeyHex);
   }
 
+  PublicKey publicKeyFromUint8ListP256(Uint8List publicKeyUint8List) {
+    var ec = getP256();
+    return ec.hexToPublicKey(bin2hex(publicKeyUint8List));
+  }
+
   /*
   The sealedBox is a concatination of publicKeyLength (4 byte) | publicKey | ciphertext
   */
@@ -511,13 +415,23 @@ class _MyWidgetState extends State<MyWidget> {
     // convert the int to a hexstring of 4 characters length
     String publicKeyLengthHex = publicKeyLength.toRadixString(16).padLeft(4, '0');
     // convert the hexstring to an Uint8List
-    Uint8List publicKeyLengthUint8List = createUint8ListFromHexString(publicKeyLengthHex);
+    //Uint8List publicKeyLengthUint8List = createUint8ListFromHexString(publicKeyLengthHex);
+    Uint8List publicKeyLengthUint8List = createUint8ListFromString(publicKeyLengthHex);
     // concatenate the data
     var bb = BytesBuilder();
-    bb.add(publicKeyLengthUint8List); // 4 bytes length of the following public key
+    bb.add(publicKeyLengthUint8List); // 2 bytes length of the following public key
     bb.add(createUint8ListFromHexString(publicKeySender.toHex())); // the publicKey
     bb.add(ciphertext); // the ciphertext
     return bb.toBytes();
+  }
+
+  int getPublicKeyLength(Uint8List publicKeyLengthUint8List) {
+    //printC('publicKeyLengthUint8List hex: ' + bin2hex(publicKeyLengthUint8List));
+    String publicKeyLengthHex = new String.fromCharCodes(publicKeyLengthUint8List);
+    if (publicKeyLengthHex.length == 1) {
+      publicKeyLengthHex = '0' + publicKeyLengthHex;
+    }
+    return int.parse(publicKeyLengthHex, radix: 16);
   }
 
 
